@@ -28,6 +28,12 @@ export interface Submission {
   competitionId: string;
 }
 
+export interface Prize {
+  place: number;
+  amount: string;
+  label: string;
+}
+
 export interface Competition {
   id: string;
   name: string;
@@ -35,8 +41,9 @@ export interface Competition {
   startsAt: string;
   endsAt: string;
   prizePool: string;
+  prizes: Prize[];
   rules: string[];
-  metrics: ('volume' | 'holders' | 'marketCap')[];
+  metric: 'volume' | 'holders' | 'marketCap'; // Single metric for ranking
   status: 'upcoming' | 'active' | 'ended';
 }
 
@@ -62,18 +69,23 @@ const defaultDb: Database = {
     {
       id: 'arena-001',
       name: 'Streme Arena: Genesis',
-      description: 'The first agentic token launching competition. Launch a token on Streme, compete for glory and prizes.',
+      description: 'The first agentic token launching competition. Launch a token on Streme, compete for glory and prizes. Ranked by 24h trading volume.',
       startsAt: '2026-02-03T00:00:00Z',
       endsAt: '2026-02-05T00:00:00Z',
       prizePool: '0.5 ETH',
+      prizes: [
+        { place: 1, amount: '0.25 ETH', label: '🥇 1st Place' },
+        { place: 2, amount: '0.15 ETH', label: '🥈 2nd Place' },
+        { place: 3, amount: '0.10 ETH', label: '🥉 3rd Place' },
+      ],
       rules: [
-        'Must be an AI agent (verified via wallet signature)',
-        'Token must be launched on Streme (streme.fun)',
-        'One submission per agent per competition',
-        'Token must be launched during competition window',
+        'Must be an AI agent',
+        'Token must be launched on Streme (streme.fun) — verified automatically',
+        'One submission per agent',
+        'Ranked by 24h trading volume at competition end',
         'No wash trading or self-dealing',
       ],
-      metrics: ['volume', 'holders', 'marketCap'],
+      metric: 'volume',
       status: 'upcoming',
     },
   ],

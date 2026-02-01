@@ -2,6 +2,12 @@
 
 import { useState, useEffect } from 'react';
 
+interface Prize {
+  place: number;
+  amount: string;
+  label: string;
+}
+
 interface Competition {
   id: string;
   name: string;
@@ -9,7 +15,9 @@ interface Competition {
   startsAt: string;
   endsAt: string;
   prizePool: string;
+  prizes: Prize[];
   rules: string[];
+  metric: string;
   status: 'upcoming' | 'active' | 'ended';
   participantCount: number;
 }
@@ -32,7 +40,7 @@ export default function Home() {
   const [competition, setCompetition] = useState<Competition | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sortBy, setSortBy] = useState<'volume24h' | 'marketCap'>('volume24h');
+  const sortBy = 'volume24h'; // Fixed to volume
 
   useEffect(() => {
     async function fetchData() {
@@ -59,7 +67,7 @@ export default function Home() {
     }
 
     fetchData();
-  }, [sortBy]);
+  }, []);
 
   const formatNumber = (num: number) => {
     if (num >= 1000000) return `$${(num / 1000000).toFixed(2)}M`;
@@ -128,7 +136,16 @@ export default function Home() {
                 <p className="text-zinc-400 mt-2">{competition.description}</p>
               </div>
               <div className="flex flex-col items-end gap-2">
-                <div className="text-3xl font-bold text-amber-500">{competition.prizePool}</div>
+                <div className="text-2xl font-bold text-amber-500">{competition.prizePool} Prize Pool</div>
+                {competition.prizes && (
+                  <div className="flex gap-3 text-sm">
+                    {competition.prizes.map((prize) => (
+                      <div key={prize.place} className="text-zinc-400">
+                        {prize.label.split(' ')[0]} {prize.amount}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="text-zinc-400 text-sm">
                   {competition.status === 'ended' ? 'Competition ended' :
                    competition.status === 'upcoming' ? `Starts ${formatDate(competition.startsAt)}` :
@@ -181,19 +198,8 @@ export default function Home() {
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
           <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
             <h3 className="font-semibold text-xl">🏆 Leaderboard</h3>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setSortBy('volume24h')}
-                className={`px-3 py-1 rounded text-sm ${sortBy === 'volume24h' ? 'bg-amber-500 text-black' : 'bg-zinc-800 text-zinc-400'}`}
-              >
-                Volume
-              </button>
-              <button
-                onClick={() => setSortBy('marketCap')}
-                className={`px-3 py-1 rounded text-sm ${sortBy === 'marketCap' ? 'bg-amber-500 text-black' : 'bg-zinc-800 text-zinc-400'}`}
-              >
-                Market Cap
-              </button>
+            <div className="text-sm text-zinc-400">
+              Ranked by 24h Volume
             </div>
           </div>
 

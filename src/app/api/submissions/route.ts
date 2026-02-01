@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, saveDb, generateId, Submission } from '@/lib/db';
+import { verifyStremeToken } from '@/lib/streme';
 
 export async function GET(request: NextRequest) {
   try {
@@ -60,9 +61,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { tokenAddress, tokenName, tokenSymbol, launchTx, competitionId } = body;
 
-    if (!tokenAddress || !tokenName || !tokenSymbol) {
+    if (!tokenAddress) {
       return NextResponse.json(
-        { error: 'tokenAddress, tokenName, and tokenSymbol are required' },
+        { error: 'tokenAddress is required' },
         { status: 400 }
       );
     }
@@ -75,14 +76,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // VERIFY TOKEN WAS DEPLOYED VIA STREME
+    const stremeToken = await verifyStremeToken(tokenAddress);
+    if (!stremeToken) {
+      return NextResponse.json(
+        { 
+          error: 'Token not found on Streme. Only tokens launched via streme.fun are eligible.',
+          hint: 'Make sure your token was deployed using Streme\'s launcher at streme.fun'
+        },
+        { status: 400 }
+      );
+    }
+
     // Get current active competition or use provided one
     const competition = competitionId 
       ? db.competitions.find(c => c.id === competitionId)
-      : db.competitions.find(c => c.status === 'active');
+      : db.competitions.find(c => c.status === 'active' || c.status === 'upcoming');
 
     if (!competition) {
       return NextResponse.json(
         { error: 'No active competition found' },
+        { status: 400 }
+      );
+    }
+
+    // Check competition timing
+    const now = new Date();
+    const startsAt = new Date(competition.startsAt);
+    const endsAt = new Date(competition.endsAt);
+
+    if (now > endsAt) {
+      return NextResponse.json(
+        { error: 'Competition has ended' },
         { status: 400 }
       );
     }
@@ -113,15 +138,22 @@ export async function POST(request: NextRequest) {
       id: generateId(),
       agentId: agent.id,
       tokenAddress: tokenAddress.toLowerCase(),
-      tokenName,
-      tokenSymbol,
+      tokenName: tokenName || stremeToken.name,
+      tokenSymbol: tokenSymbol || stremeToken.symbol,
       launchTx: launchTx || '',
       submittedAt: new Date().toISOString(),
-      verified: false, // Will be verified by checking on-chain
+      verified: true, // Verified via Streme API
       competitionId: competition.id,
     };
 
     db.submissions.push(submission);
+    
+    // Mark agent as active
+    const agentIndex = db.agents.findIndex(a => a.id === agent.id);
+    if (agentIndex >= 0) {
+      db.agents[agentIndex].status = 'active';
+    }
+    
     await saveDb(db);
 
     return NextResponse.json({
@@ -133,8 +165,18 @@ export async function POST(request: NextRequest) {
         tokenSymbol: submission.tokenSymbol,
         competitionId: submission.competitionId,
         submittedAt: submission.submittedAt,
+        verified: submission.verified,
       },
-      message: '🚀 Token submitted! It will appear on the leaderboard once verified.',
+      stremeData: {
+        deployer: stremeToken.deployer,
+        image: stremeToken.image,
+      },
+      message: '🚀 Token verified and submitted! You\'re in the competition.',
+      competition: {
+        name: competition.name,
+        endsAt: competition.endsAt,
+        prizes: competition.prizePool,
+      },
     });
   } catch (error) {
     console.error('Submission error:', error);
